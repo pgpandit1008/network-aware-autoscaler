@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-aware-autoscaler
+  namespace: kube-system
+  labels:
+    app: network-aware-autoscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: network-aware-autoscaler
+  template:
+    metadata:
+      labels:
+        app: network-aware-autoscaler
+    spec:
+      serviceAccountName: network-aware-autoscaler
+      containers:
+        - name: autoscaler
+          image: network-aware-autoscaler:latest
+          args:
+            - "--prometheus-url=http://prometheus-operated.monitoring.svc.cluster.local:9090"
+            - "--sync-interval=30s"
+            - "--cpu-threshold=75"
+            - "--mem-threshold=80"
+            - "--p95-threshold=200"
+            - "--namespace=default"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: network-aware-autoscaler
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: network-aware-autoscaler
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: network-aware-autoscaler
+subjects:
+  - kind: ServiceAccount
+    name: network-aware-autoscaler
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: network-aware-autoscaler
+  apiGroup: rbac.authorization.k8s.io
